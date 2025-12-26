@@ -35,6 +35,7 @@ module purm
 
    ! array for background cross sections
    real(kr),dimension(:),allocatable::sb
+   real(kr), dimension(:),allocatable::sb_raw
 
    ! probability table globals
    real(kr),dimension(:,:,:),allocatable::bval
@@ -112,6 +113,7 @@ contains
    integer::nwd,nc153,ncds,ihave,nc,nd,maxtst
    real(kr)::time,za,awr,ez,sigx,temz,h
    real(kr)::bkgz(4)
+   real(kr)::varpres(4)
    character(60)::strng1,strng2
    real(kr),dimension(:),allocatable::a
    real(kr),dimension(:,:,:),allocatable::tabl
@@ -493,6 +495,11 @@ contains
    do while (ie.lt.nunr)
       ie=ie+nstep
       if (ie.gt.nunr) ie=nunr
+
+      varpres(1)=sb_raw(ie)
+      varpres(2)=sb_raw(nunr+ie)
+      varpres(3)=sb_raw(nunr*2+ie)
+      varpres(4)=sb_raw(nunr*3+ie)
       read(nscr) ez
       read(nscr) (((tabl(i,j,k),i=1,nbin),j=1,5),k=1,ntemp)
       read(nscr) (((sigu(i,j,k),i=1,5),j=1,nsigz),k=1,ntemp)
@@ -513,8 +520,8 @@ contains
          do j=1,nbin
             l=n1+j+nbin*(i-1)
             if (lssf.eq.1) then
-               if (sigu(i-1,1,1).ne.0) then
-                  a(l)=a(l)/sigu(i-1,1,1)
+               if (sigu(i-1,1,1).ne.0 .and. varpres(i-1).ne.0) then
+                  a(l)=(a(l) + varpres(i-1) - sigu(i-1,1,1))/varpres(i-1)
                else
                   a(l)=1
                endif
@@ -1106,9 +1113,11 @@ contains
    allocate(thr(nw))
    nw=nunr*4
    allocate(sb(nunr*4))
+   allocate(sb_raw(nunr*4))
 
    !--initialise background array for total, elastic, fission and capture
    sb(1:nunr*4)=0
+   sb_raw(1:nunr*4)=0
 
    !--loop over reactions
    !--saving resonance cross sections
@@ -1146,6 +1155,7 @@ contains
                if (ie.eq.1) e=up*e
                if (ie.eq.nunr) e=dn*e
                call gety1(e,enext,idis,sb(ibase+ie),nendf,a(iscr))
+               sb_raw(ibase+ie) = sb(ibase+ie)
             enddo
          endif
       endif
